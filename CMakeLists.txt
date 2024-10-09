@@ -5,11 +5,11 @@ enable_language(C)
 find_package(Git)
 
 if (NOT ROCKSDB_GIT_REPO)
-  set(ROCKSDB_GIT_REPO "https://github.com/tikv/rocksdb.git")
+  set(ROCKSDB_GIT_REPO "https://github.com/v01dstar/rocksdb.git")
 endif()
 
 if (NOT ROCKSDB_GIT_BRANCH)
-  set(ROCKSDB_GIT_BRANCH "8.10.tikv")
+  set(ROCKSDB_GIT_BRANCH "remove-raftstore-v2")
 endif()
 
 if (NOT DEFINED ROCKSDB_DIR)
