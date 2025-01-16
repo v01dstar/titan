@@ -6,16 +6,14 @@
 namespace rocksdb {
 namespace titandb {
 
-std::string BlobStorage::EncodeBlobCache(const BlobIndex& index) {
-  std::string cache_key(cache_prefix_);
-  PutVarint64(&cache_key, index.file_number);
-  PutVarint64(&cache_key, index.blob_handle.offset);
-  return cache_key;
+CacheKey BlobStorage::EncodeBlobCache(const BlobIndex& index) {
+  OffsetableCacheKey offsetable_cache_key(db_options_.dirname, cache_prefix_,
+                                          index.file_number);
+  return offsetable_cache_key.WithOffset(index.blob_handle.offset);
 }
 
-Status BlobStorage::TryGetBlobCache(const std::string& cache_key,
-                                    BlobRecord* record, PinnableSlice* value,
-                                    bool* cache_hit) {
+Status BlobStorage::TryGetBlobCache(const Slice& cache_key, BlobRecord* record,
+                                    PinnableSlice* value, bool* cache_hit) {
   Status s;
   Cache::Handle* cache_handle = blob_cache_->Lookup(cache_key);
   if (cache_handle) {
@@ -37,12 +35,12 @@ Status BlobStorage::TryGetBlobCache(const std::string& cache_key,
 Status BlobStorage::Get(const ReadOptions& options, const BlobIndex& index,
                         BlobRecord* record, PinnableSlice* value,
                         bool for_compaction) {
-  std::string cache_key;
+  CacheKey cache_key;
 
   if (blob_cache_) {
     cache_key = EncodeBlobCache(index);
     bool cache_hit;
-    Status s = TryGetBlobCache(cache_key, record, value, &cache_hit);
+    Status s = TryGetBlobCache(cache_key.AsSlice(), record, value, &cache_hit);
     if (!s.ok()) return s;
     if (cache_hit) return s;
   }
@@ -57,7 +55,8 @@ Status BlobStorage::Get(const ReadOptions& options, const BlobIndex& index,
   if (blob_cache_ && options.fill_cache) {
     Cache::Handle* cache_handle = nullptr;
     auto cache_value = new OwnedSlice(std::move(blob));
-    blob_cache_->Insert(cache_key, cache_value, &kBlobValueCacheItemHelper,
+    blob_cache_->Insert(cache_key.AsSlice(), cache_value,
+                        &kBlobValueCacheItemHelper,
                         cache_value->size() + sizeof(*cache_value),
                         &cache_handle, Cache::Priority::BOTTOM);
     value->PinSlice(record->value, UnrefCacheHandle, blob_cache_.get(),

@@ -133,12 +133,13 @@ class TitanDBIterator : public Iterator {
       return s;
     }
 
-    std::string cache_key;
+    CacheKey cache_key;
     auto blob_cache = storage_->blob_cache();
     if (blob_cache) {
       cache_key = storage_->EncodeBlobCache(index);
       bool cache_hit;
-      s = storage_->TryGetBlobCache(cache_key, &record_, &buffer_, &cache_hit);
+      s = storage_->TryGetBlobCache(cache_key.AsSlice(), &record_, &buffer_,
+                                    &cache_hit);
       if (!s.ok()) return s;
       if (cache_hit) return s;
     }
@@ -175,7 +176,8 @@ class TitanDBIterator : public Iterator {
     if (blob_cache && options_.fill_cache) {
       Cache::Handle *cache_handle = nullptr;
       auto cache_value = new OwnedSlice(std::move(blob));
-      blob_cache->Insert(cache_key, cache_value, &kBlobValueCacheItemHelper,
+      blob_cache->Insert(cache_key.AsSlice(), cache_value,
+                         &kBlobValueCacheItemHelper,
                          cache_value->size() + sizeof(*cache_value),
                          &cache_handle, Cache::Priority::BOTTOM);
       buffer_.PinSlice(*cache_value, UnrefCacheHandle, blob_cache,

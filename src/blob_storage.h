@@ -4,6 +4,7 @@
 #endif
 #include <cinttypes>
 
+#include "cache/cache_key.h"
 #include "rocksdb/options.h"
 
 #include "blob_file_cache.h"
@@ -68,10 +69,10 @@ class BlobStorage {
   // The provided buffer is used to store the record data, so the buffer must be
   // valid when the record is used.
   // If cache hit, set cache_hit to true, otherwise false.
-  Status TryGetBlobCache(const std::string& cache_key, BlobRecord* record,
+  Status TryGetBlobCache(const Slice& cache_key, BlobRecord* record,
                          PinnableSlice* value, bool* cache_hit);
 
-  std::string EncodeBlobCache(const BlobIndex& index);
+  CacheKey EncodeBlobCache(const BlobIndex& index);
 
   // Creates a prefetcher for the specified file number.
   Status NewPrefetcher(uint64_t file_number,
@@ -194,9 +195,9 @@ class BlobStorage {
    public:
     // The default constructor is not supposed to be used.
     // It is only to make std::multimap can compile.
-    InternalComparator() : comparator_(nullptr){};
+    InternalComparator() : comparator_(nullptr) {};
     explicit InternalComparator(const Comparator* comparator)
-        : comparator_(comparator){};
+        : comparator_(comparator) {};
     bool operator()(const Slice& key1, const Slice& key2) const {
       assert(comparator_ != nullptr);
       return comparator_->Compare(key1, key2) < 0;

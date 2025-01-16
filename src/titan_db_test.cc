@@ -2240,6 +2240,40 @@ TEST_F(TitanDBTest, OnlineChangeBlobFileDiscardableRatio) {
   // The discardable ratio should be updated after GC.
   ASSERT_LT(blob_file->second.lock()->GetDiscardableRatio(), 0.4);
 }
+
+TEST_F(TitanDBTest, MultiGetWithClockCache) {
+  options_.min_blob_size = 1024;
+  std::vector<int> cache_sizes = {4 * 1024, 16 * 1024 * 1024};
+
+  for (auto cache_size : cache_sizes) {
+    // Create a shared clock cache for block cache and blob cache.
+    auto clock_cache_opts = HyperClockCacheOptions(cache_size, 0);
+    auto shared_clock_cache = clock_cache_opts.MakeSharedCache();
+    BlockBasedTableOptions table_opts;
+    table_opts.block_cache = shared_clock_cache;
+    options_.table_factory.reset(NewBlockBasedTableFactory(table_opts));
+    options_.blob_cache = shared_clock_cache;
+
+    Open();
+    ASSERT_OK(db_->Put(WriteOptions(), "k1", std::string(100, 'v')));
+    ASSERT_OK(db_->Put(WriteOptions(), "k2", std::string(100, 'v')));
+    ASSERT_OK(db_->Put(WriteOptions(), "k3", std::string(10 * 1024, 'v')));
+    ASSERT_OK(db_->Put(WriteOptions(), "k4", std::string(100 * 1024, 'v')));
+    Flush();
+
+    std::vector<std::string> values;
+    db_->MultiGet(ReadOptions(), std::vector<Slice>{"k1", "k2", "k3", "k4"},
+                  &values);
+    ASSERT_EQ(values[0].size(), 100);
+    ASSERT_EQ(values[1].size(), 100);
+    ASSERT_EQ(values[2].size(), 10 * 1024);
+    ASSERT_EQ(values[3].size(), 100 * 1024);
+    Close();
+    DeleteDir(env_, options_.dirname);
+    DeleteDir(env_, dbname_);
+  }
+}
+
 }  // namespace titandb
 }  // namespace rocksdb
 
